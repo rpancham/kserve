@@ -24,15 +24,15 @@ jobs:
       - name: Get latest tag
         id: get_tag
         run: |
-          echo "old_tag_name=$(git ls-remote --tags origin | awk -F'/' '{print $3}' | grep -v '{}' | sort -V | tail -n1)" >> $GITHUB_ENV
+          echo "old_tag_name=$(git ls-remote --tags origin | awk -F'/' '{print $3}' | grep -v '{}' | sort -V | tail -n1)" >> $GITHUB_OUTPUT
   
       - name: print tag
         id: print_tag
         run: | 
-          echo "Old Tag: ${{ steps.get_tag.outputs.old_tag_name }}"
-          echo "LATEST_TAG=${{ steps.get_tag.outputs.old_tag_name }}" >> $GITHUB_ENV
+          echo "Old Tag=${{ steps.get_tag.outputs.old_tag_name }}"
           echo "NEW_TAG=${{ github.event.inputs.tag_name }}" >> $GITHUB_ENV
-              
+          echo "$(basename ${{ github.ref }})"
+      
       - name: Check if new tag already exists
         id: check_tag
         run: |
@@ -47,20 +47,6 @@ jobs:
         run: |
           exit 1
           echo "Tag already exists. Workflow failed."
-
-      # - name: Fetch all tags
-      #   run: git fetch --tags
-      # - name: Check if NEW_TAG matches the latest tag
-      #   id: check_latest_tag
-      #   env:
-      #     NEW_TAG: ${{ github.ref }}
-      #   run: |
-      #     LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
-      #     echo "Latest tag: $LATEST_TAG"
-      #     if [ "$LATEST_TAG" = "${NEW_TAG#refs/tags/}" ]; then
-      #       echo "Error: NEW_TAG '${NEW_TAG#refs/tags/}' tag already exists '$LATEST_TAG'."
-      #       exit 1
-      #     fi
      
   update-params-env:
     runs-on: ubuntu-latest
@@ -70,22 +56,24 @@ jobs:
       old_release_tag: ${{ needs.fetch-tag.outputs.old_tag }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-              
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+           
       - name: Read params.env
         id: read_params_env
         run: |
-          echo "params_env=$(cat config/overlays/odh/params.env)" >> $GITHUB_ENV
+          echo "params_env=$(cat config/params.env)" >> $GITHUB_ENV
               
       - name: Update params.env with new release version
         run: |     
-          sed -i 's|:v[0-9.]*\b|:${{ github.event.inputs.tag_name }}|gm' config/overlays/odh/params.env
+          sed -i 's|:v[0-9.]*\b|:${{ github.event.inputs.tag_name }}|gm' config/params.env
       - name: Commit changes
         run: |
           git config --global user.email "github-actions@github.com"
           git config --global user.name "GitHub Actions"
-          git add config/overlays/odh/params.env
-          git commit -m "Update image refs for odh release [${{ needs.fetch-tag.outputs.old_tag }}]"
+          git add config/params.env
+          git commit -m "Update image refs for odh release."
           git push 
 
   changelog:
@@ -98,10 +86,7 @@ jobs:
       old_tag: ${{ needs.fetch-tag.outputs.old_tag }} 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-      - name: changelog print old tag
-        run: echo  "old_tag is $old_tag"
-        
+        uses: actions/checkout@v4   
       - name: Build Changelog
         id: build_changelog
         uses: mikepenz/release-changelog-builder-action@v4
@@ -109,11 +94,9 @@ jobs:
           fromTag: ${{ needs.fetch-tag.outputs.old_tag }}
           toTag:  ${{ github.event.inputs.tag_name }}
           token: ${{ github.token }}
-      - name: print_output
-        run: echo "${{ toJson(steps.build_changelog.outputs) }}"
-
+          
   release:
-    name: Release
+    name: Release 
     needs: [changelog, fetch-tag]
     runs-on: ubuntu-latest
     env:
@@ -135,5 +118,4 @@ jobs:
           files: bin/*
           generate_release_notes: true
           name: ${{ github.event.inputs.tag_name }}
-          body: |
-            ${{ env.changelog }}
+          
