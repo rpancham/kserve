@@ -65,11 +65,11 @@ jobs:
       - name: Read params.env
         id: read_params_env
         run: |
-          echo "params_env=$(cat config/params.env)" >> $GITHUB_ENV
+          echo "params_env=$(cat config/overlays/odh/params.env)" >> $GITHUB_ENV
               
       - name: Update params.env with new release version
         run: |     
-          sed -i 's|:v[0-9.]*\b|:${{ github.event.inputs.tag_name }}|gm' config/params.env
+          sed -i 's|:v[0-9.]*\b|:${{ github.event.inputs.tag_name }}|gm' config/overlays/odh/params.env
       - name: Commit changes
         run: |
           git config --global user.email "github-actions@github.com"
