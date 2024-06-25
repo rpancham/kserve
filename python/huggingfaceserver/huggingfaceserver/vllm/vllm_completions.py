@@ -144,9 +144,10 @@ class OpenAIServingCompletion:
 
                 generators.append(
                     self.engine.generate(
-                        {"prompt": prompt, "prompt_token_ids": input_ids},
+                        prompt,
                         sampling_params,
                         f"{request_id}-{i}",
+                        prompt_token_ids=input_ids,
                     )
                 )
         except Exception as e:
@@ -174,7 +175,7 @@ class OpenAIServingCompletion:
             )
 
         # Non-streaming response
-        final_res_batch: List[RequestOutput] = [None] * len(prompts)
+        final_res_batch: RequestOutput = [None] * len(prompts)
         try:
             async for i, res in result_generator:
                 final_res_batch[i] = res
